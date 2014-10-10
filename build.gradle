@@ -1,0 +1,119 @@
+import org.gradle.api.tasks.bundling.Zip
+
+repositories {
+  mavenLocal()
+  jcenter()
+}
+
+apply plugin:'groovy'
+
+version = '1.0'
+
+ext {
+
+  javafxHome = System.env['JAVAFX_HOME']
+  if(javafxHome)
+    jfxrt = "${javafxHome}/rt/lib/jfxrt.jar"
+  else {
+    String javaHome = System.getProperty('java.home')
+    File jarFile = new File(javaHome, 'lib/jfxrt.jar')
+    if(jarFile.exists())
+      jfxrt = jarFile
+    else {
+      jarFile = new File(javaHome, 'lib/ext/jfxrt.jar')
+      if(jarFile.exists())
+        jfxrt = jarFile
+      else
+        jfxrt = null
+    }
+  }
+
+  mainClass = 'org.akhikhl.incrementalhtml.Main'
+}
+
+dependencies {
+  compile "org.codehaus.groovyfx:groovyfx:$groovyfx_version"
+  compile "org.codehaus.groovy:groovy-all:$groovy_version"
+  compile files(jfxrt)
+  compile 'com.rometools:rome:1.5.0'  
+  compile 'com.rometools:rome-fetcher:1.5.0'
+  compile 'org.jsoup:jsoup:1.8.1'
+}
+
+jar {
+  manifest { attributes 'Main-Class': project.ext.mainClass }
+}
+
+task('run', type: JavaExec, group: 'run') {
+  description = 'Runs the application directly on classpath libraries'
+  dependsOn tasks.build
+  main = project.mainClass
+  classpath sourceSets.main.runtimeClasspath
+}
+
+task('debug', type: JavaExec, group: 'run') {
+  description = 'Runs the application directly on classpath libraries, in debug mode'
+  dependsOn tasks.build
+  main = project.mainClass
+  classpath sourceSets.main.runtimeClasspath
+  debug = true
+}
+
+File outputBaseDir = new File(project.buildDir, 'output')
+
+File outputDir = new File(outputBaseDir, "${project.name}-${project.version}")
+
+task('buildProduct', group: 'product') {
+
+  description = 'Builds the product'
+
+  dependsOn project.tasks.build
+
+  inputs.file project.tasks.jar.archivePath
+  inputs.files project.configurations.runtime.files
+  outputs.dir outputDir
+
+  doLast {
+    File libDir = new File(outputDir, 'lib')
+
+    project.copy {
+      from project.tasks.jar.archivePath
+      into libDir
+    }
+
+    project.configurations.runtime.each { file ->
+      project.copy {
+        from file
+        into libDir
+      }
+    }
+
+    File launchScriptFile = new File(outputDir, project.name + '.sh')
+
+    launchScriptFile.text = '#!/bin/bash\n' +
+      'SOURCE="${BASH_SOURCE[0]}"\n' +
+      'while [ -h "$SOURCE" ]; do # resolve $SOURCE until the file is no longer a symlink\n' +
+      'DIR="$( cd -P "$( dirname "$SOURCE" )" && pwd )"\n' +
+      'SOURCE="$(readlink "$SOURCE")"\n' +
+      '[[ $SOURCE != /* ]] && SOURCE="$DIR/$SOURCE"\n' +
+      'done\n' +
+      'DIR="$( cd -P "$( dirname "$SOURCE" )" && pwd )"\n' +
+      'java -Dfile.encoding=UTF8 -cp "${DIR}/lib/*" ' + project.ext.mainClass + ' $@'
+
+    launchScriptFile.setExecutable(true)
+
+    launchScriptFile = new File(outputDir, project.name + '.bat')
+
+    launchScriptFile.text = '@java.exe -Dfile.encoding=UTF8 -cp "%~dp0\\lib\\*" ' + project.ext.mainClass + ' %*'
+  }
+} // buildProduct
+
+task('archiveProduct', type: Zip, group: 'product') {
+  description = 'Archives the product'
+  dependsOn tasks.buildProduct
+  from outputDir
+  destinationDir = outputBaseDir
+  baseName = project.name
+  version = project.version
+} // archiveProduct
+

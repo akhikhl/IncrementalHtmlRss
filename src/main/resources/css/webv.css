@@ -1,0 +1,11 @@
+.rssEntry {
+  font-size: 9pt;
+  font-family: monospace, Monospaced, Courier New;
+}
+
+.rssEntry a.title {
+  font-size: 11pt;
+  text-decoration: none;
+  padding: 4px;
+  background-color: Gainsboro;
+}
