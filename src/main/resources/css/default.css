@@ -1,3 +1,7 @@
+/* 
+ * default.css defines styles for the GUI elements
+ */
+
 .webv {
   -fx-font-smoothing-type: gray;
   -fx-background-color: #FFFFFF;
